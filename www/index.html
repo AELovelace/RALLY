@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MicroShell</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #fdf5f7;
+      --panel: rgba(255, 247, 250, 0.86);
+      --panel-strong: rgba(255, 235, 242, 0.92);
+      --ink: #35242d;
+      --muted: #7a5b67;
+      --accent: #d96b93;
+      --accent-strong: #b94f79;
+      --line: rgba(182, 118, 145, 0.28);
+      --console: rgba(42, 22, 31, 0.9);
+      --console-ink: #fff1f6;
+      --ok: #4b8f72;
+      --err: #b14762;
+      --shadow: 0 20px 48px rgba(120, 61, 93, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Georgia, 'Times New Roman', serif;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(255, 245, 249, 0.58), rgba(255, 236, 243, 0.68)),
+        url('/bg.jpg') center center / cover no-repeat fixed;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(255, 210, 228, 0.55), transparent 20%),
+        radial-gradient(circle at 86% 14%, rgba(255, 226, 236, 0.4), transparent 18%),
+        radial-gradient(circle at 78% 76%, rgba(232, 170, 195, 0.24), transparent 22%);
+    }
+
+    .shell {
+      width: min(1600px, 80vw);
+      margin: 18px auto;
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 280px 1fr;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.36);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(14px);
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100vh - 36px);
+    }
+
+    .editor {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      min-height: calc(100vh - 36px);
+    }
+
+    .section {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section:last-child {
+      border-bottom: 0;
+    }
+
+    h1, h2 {
+      margin: 0;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      color: #5d2b45;
+    }
+
+    h2 {
+      font-size: 0.96rem;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .stat {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--panel-strong);
+      border: 1px solid rgba(217, 107, 147, 0.15);
+    }
+
+    .stat-label {
+      display: block;
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stat-value {
+      display: block;
+      margin-top: 4px;
+      font-size: 1rem;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button,
+    input {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      background: var(--panel);
+      color: var(--ink);
+      transition: transform 120ms ease, background 120ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: rgba(255, 234, 241, 0.92);
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff7fb;
+      border-color: var(--accent-strong);
+    }
+
+    button.primary:hover {
+      background: var(--accent-strong);
+    }
+
+    button.warn {
+      color: var(--err);
+    }
+
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 360px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .file-item {
+      width: 100%;
+      text-align: left;
+      background: rgba(255, 251, 253, 0.9);
+    }
+
+    .file-item.active {
+      border-color: var(--accent);
+      background: rgba(255, 226, 237, 0.96);
+    }
+
+    .file-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .file-row input {
+      flex: 1;
+      min-width: 0;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 360px;
+      resize: vertical;
+      border: 0;
+      padding: 18px;
+      font: 15px/1.5 'Courier New', monospace;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 235, 244, 0.84));
+      color: #2b1f25;
+    }
+
+    .console {
+      margin: 0;
+      min-height: 220px;
+      max-height: 320px;
+      overflow: auto;
+      padding: 18px;
+      background: linear-gradient(180deg, rgba(69, 34, 51, 0.96), rgba(29, 13, 22, 0.98));
+      color: var(--console-ink);
+      font: 14px/1.45 'Courier New', monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 900px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar,
+      .editor {
+        min-height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="panel sidebar">
+      <section class="section">
+        <h1>MicroShell</h1>
+        <p>Browser-based command runner for trusted LAN use. Variables persist between commands until reboot.</p>
+        <div class="file-row">
+          <input id="tokenInput" placeholder="Bearer token (optional)" />
+          <button id="saveToken">Use</button>
+        </div>
+        <div class="status-grid">
+          <div class="stat"><span class="stat-label">IP</span><span class="stat-value" id="ip">-</span></div>
+          <div class="stat"><span class="stat-label">Heap</span><span class="stat-value" id="heap">-</span></div>
+          <div class="stat"><span class="stat-label">Uptime</span><span class="stat-value" id="uptime">-</span></div>
+          <div class="stat"><span class="stat-label">Busy</span><span class="stat-value" id="busy">-</span></div>
+        </div>
+      </section>
+      <section class="section">
+        <h2>Scripts</h2>
+        <p>Only flat filenames are allowed inside the on-device <strong>scripts</strong> directory.</p>
+        <div class="file-row">
+          <input id="filename" placeholder="blink.py" />
+          <button id="newFile">New</button>
+        </div>
+        <div class="file-list" id="files"></div>
+      </section>
+      <section class="section">
+        <div class="toolbar">
+          <button id="refreshFiles">Refresh</button>
+          <button id="deleteFile" class="warn">Delete</button>
+          <button id="resetBoard" class="warn">Reset Board</button>
+        </div>
+      </section>
+    </aside>
+    <main class="panel editor">
+      <section class="section">
+        <div class="toolbar">
+          <button id="runSelection" class="primary">Run Selection</button>
+          <button id="runEditor">Run Editor</button>
+          <button id="saveFile">Save Script</button>
+          <button id="runSaved">Run Saved Script</button>
+          <button id="clearOutput">Clear Output</button>
+        </div>
+        <p class="note">Use Ctrl+Enter to run the current selection or the full editor contents.</p>
+      </section>
+      <section class="section">
+        <textarea id="editor">print('MicroShell ready')
+</textarea>
+      </section>
+      <section class="section">
+        <h2>Output</h2>
+        <pre class="console" id="output"></pre>
+      </section>
+    </main>
+  </div>
+  <script>
+    let token = localStorage.getItem('microshell-token') || '';
+    const state = {
+      selectedFile: '',
+      lastSavedSource: '',
+    };
+
+    const elements = {
+      ip: document.getElementById('ip'),
+      heap: document.getElementById('heap'),
+      uptime: document.getElementById('uptime'),
+      busy: document.getElementById('busy'),
+      tokenInput: document.getElementById('tokenInput'),
+      filename: document.getElementById('filename'),
+      files: document.getElementById('files'),
+      editor: document.getElementById('editor'),
+      output: document.getElementById('output'),
+    };
+
+    function headers(extra) {
+      const merged = Object.assign({'Content-Type': 'application/json'}, extra || {});
+      if (token) {
+        merged.Authorization = 'Bearer ' + token;
+      }
+      return merged;
+    }
+
+    async function api(path, options) {
+      const response = await fetch(path, options || {});
+      const text = await response.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (error) {
+        data = {raw: text};
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || data.raw || response.statusText);
+      }
+
+      return data;
+    }
+
+    function appendOutput(title, content) {
+      const stamp = new Date().toLocaleTimeString();
+      elements.output.textContent += '[' + stamp + '] ' + title + '\n' + (content || '(no output)') + '\n\n';
+      elements.output.scrollTop = elements.output.scrollHeight;
+    }
+
+    function currentSelection() {
+      const editor = elements.editor;
+      if (editor.selectionStart === editor.selectionEnd) {
+        return editor.value;
+      }
+      return editor.value.slice(editor.selectionStart, editor.selectionEnd);
+    }
+
+    function setSelectedFile(name) {
+      state.selectedFile = name;
+      elements.filename.value = name;
+      const buttons = elements.files.querySelectorAll('button');
+      for (let i = 0; i < buttons.length; i += 1) {
+        buttons[i].classList.toggle('active', buttons[i].dataset.name === name);
+      }
+    }
+
+    async function refreshStatus() {
+      const status = await api('/api/status');
+      elements.ip.textContent = status.ip || '-';
+      elements.heap.textContent = String(status.heap_free);
+      elements.uptime.textContent = status.uptime_s + 's';
+      elements.busy.textContent = status.busy ? 'yes' : 'no';
+    }
+
+    async function refreshFiles() {
+      const payload = await api('/api/files');
+      elements.files.innerHTML = '';
+      payload.files.forEach((name) => {
+        const button = document.createElement('button');
+        button.textContent = name;
+        button.className = 'file-item';
+        button.dataset.name = name;
+        button.addEventListener('click', async () => {
+          const file = await api('/api/files/' + encodeURIComponent(name));
+          setSelectedFile(name);
+          elements.editor.value = file.content;
+          state.lastSavedSource = file.content;
+          localStorage.setItem('microshell-editor', file.content);
+        });
+        elements.files.appendChild(button);
+      });
+
+      if (state.selectedFile) {
+        setSelectedFile(state.selectedFile);
+      }
+    }
+
+    async function runCode(code) {
+      const payload = await api('/api/exec', {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({code: code, mode: 'auto'})
+      });
+      appendOutput('exec', payload.output || payload.result || '(no output)');
+      refreshStatus().catch(() => {});
+    }
+
+    async function saveCurrentFile() {
+      const rawName = elements.filename.value.trim();
+      if (!rawName) {
+        throw new Error('Enter a file name first');
+      }
+
+      await api('/api/files/' + encodeURIComponent(rawName), {
+        method: 'PUT',
+        headers: headers(),
+        body: JSON.stringify({content: elements.editor.value})
+      });
+
+      state.lastSavedSource = elements.editor.value;
+      setSelectedFile(rawName);
+      await refreshFiles();
+      appendOutput('save', 'Saved ' + rawName);
+    }
+
+    document.getElementById('runSelection').addEventListener('click', async () => {
+      try {
+        await runCode(currentSelection());
+      } catch (error) {
+        appendOutput('error', error.message);
+      }
+    });
+
+    document.getElementById('runEditor').addEventListener('click', async () => {
+      try {
+        await runCode(elements.editor.value);
+      } catch (error) {
+        appendOutput('error', error.message);
+      }
+    });
+
+    document.getElementById('saveFile').addEventListener('click', async () => {
+      try {
+        await saveCurrentFile();
+      } catch (error) {
+        appendOutput('error', error.message);
+      }
+    });
+
+    document.getElementById('runSaved').addEventListener('click', async () => {
+      try {
+        const name = elements.filename.value.trim();
+        if (!name) {
+          throw new Error('Choose or save a script first');
+        }
+        const payload = await api('/api/run', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({name: name})
+        });
+        appendOutput('run ' + name, payload.output || payload.result || '(no output)');
+        refreshStatus().catch(() => {});
+      } catch (error) {
+        appendOutput('error', error.message);
+      }
+    });
+
+    document.getElementById('refreshFiles').addEventListener('click', () => {
+      refreshFiles().catch((error) => appendOutput('error', error.message));
+    });
+
+    document.getElementById('newFile').addEventListener('click', () => {
+      const name = elements.filename.value.trim() || 'scratch.py';
+      setSelectedFile(name);
+      elements.editor.value = '';
+      elements.editor.focus();
+      appendOutput('new', 'Ready to edit ' + name);
+    });
+
+    document.getElementById('deleteFile').addEventListener('click', async () => {
+      try {
+        const name = elements.filename.value.trim();
+        if (!name) {
+          throw new Error('Choose a script first');
+        }
+        await api('/api/files/' + encodeURIComponent(name), {
+          method: 'DELETE',
+          headers: headers()
+        });
+        if (state.selectedFile === name) {
+          setSelectedFile('');
+        }
+        await refreshFiles();
+        appendOutput('delete', 'Removed ' + name);
+      } catch (error) {
+        appendOutput('error', error.message);
+      }
+    });
+
+    document.getElementById('resetBoard').addEventListener('click', async () => {
+      try {
+        appendOutput('reset', 'Requesting device reset...');
+        await api('/api/reset', {
+          method: 'POST',
+          headers: headers(),
+          body: '{}'
+        });
+      } catch (error) {
+        appendOutput('error', error.message);
+      }
+    });
+
+    document.getElementById('clearOutput').addEventListener('click', () => {
+      elements.output.textContent = '';
+    });
+
+    document.getElementById('saveToken').addEventListener('click', () => {
+      token = elements.tokenInput.value.trim();
+      localStorage.setItem('microshell-token', token);
+      appendOutput('auth', 'Stored bearer token for future requests');
+      refreshStatus().catch((error) => appendOutput('error', error.message));
+    });
+
+    elements.editor.addEventListener('input', () => {
+      localStorage.setItem('microshell-editor', elements.editor.value);
+    });
+
+    elements.editor.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && event.ctrlKey) {
+        event.preventDefault();
+        document.getElementById('runSelection').click();
+      }
+    });
+
+    const savedEditor = localStorage.getItem('microshell-editor');
+    if (savedEditor) {
+      elements.editor.value = savedEditor;
+    }
+    elements.tokenInput.value = token;
+
+    refreshStatus().catch((error) => appendOutput('error', error.message));
+    refreshFiles().catch((error) => appendOutput('error', error.message));
+    setInterval(() => refreshStatus().catch(() => {}), 5000);
+  </script>
+</body>
+</html>
