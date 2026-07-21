@@ -424,13 +424,6 @@ def handle_client(client):
             send_file(client, static_path('index.html'), 'text/html; charset=utf-8')
             return
 
-        if method == 'GET' and route == '/bg.jpg':
-            try:
-                send_file(client, 'bg.jpg', 'image/jpeg')
-            except OSError:
-                send_response(client, '404 Not Found', 'bg.jpg not found')
-            return
-
         send_response(client, '404 Not Found', 'Not found')
     except Exception as exc:
         error_text = 'Request failed\n' + repr(exc)
